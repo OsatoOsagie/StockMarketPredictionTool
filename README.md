@@ -1,4 +1,5 @@
 # Your project name here
+AI Diet Consultant
 
 ## Information about this repository
 
