@@ -12,11 +12,21 @@ from alpha_vantage.timeseries import TimeSeries
 import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import MinMaxScaler
+import math
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
+from sklearn.ensemble import RandomForestRegressor
+from tensorflow import keras
+import numpy as np
+import time
 st.write(""" #Stock Market Web Application
 **Visually** show data on a stock! Date range from Jan 2, 2020 - Aug 4, 2020
 """)
 
+sc = MinMaxScaler(feature_range = (0, 1))
 image= Image.open("/Users/aesthetic/Desktop/oo115/PycharmProjects/pythonProject/randomBotimg.png")
 st.image(image, use_column_width=True)
 
@@ -26,14 +36,18 @@ st.sidebar.header('User Input')
 # present date
 today = date.today()
 
-print("Today's date:", today)
-
 # function to obtain the users input
 def get_input():
     start_date = st.sidebar.text_input("Start Date", "2015-01-01")
     end_date = st.sidebar.text_input("End Date", today)
     stock_symbol = st.sidebar.text_input("Stock Symbol", "AAPL")
-    return start_date, end_date, stock_symbol
+    num_days = st.sidebar.selectbox(
+        'Select Number of Days?',
+        (1, 2, 3, 4, 5, 6, 7))
+    model = st.sidebar.selectbox(
+      'Select Model?',
+     ('Ridge Regression', 'Random Forest', 'LSTM'))
+    return start_date, end_date, stock_symbol,num_days,model
 
 # sym = 'AAPL'
 
@@ -50,12 +64,16 @@ def interactive_plot(df, title):
   fig = px.line(title = title)
   for i in df.columns[1:]:
     fig.add_scatter(x = df['date'], y = df[i], name = i)
-  fig.show()
+  st.write(fig)
+
+
 
 # get users input
-start, end,symbol= get_input()
+start_date, end_date, symbol, num_days, model= get_input()
+
+
 # get the data
-data_dated= stock_data(symbol,start,end)
+data_dated= stock_data(symbol, start_date, end_date)
 
 # st.write(data_dated)
 
@@ -63,11 +81,16 @@ data_dated= stock_data(symbol,start,end)
 st.header(symbol+" Close Price\n")
 st.line_chart(data_dated['4. close'])
 
-fig, ax = plt.subplots(figsize=(10,6))
-sns.heatmap(data_dated.corr(), center=0, cmap='Blues' , annot=True)
-ax.set_title('Multi-Collinearity of Car Attributes')
 
-st.write(fig)
+def show_corr():
+
+    fig, ax = plt.subplots(figsize=(10,6))
+    sns.heatmap(data_dated.corr(), center=0, cmap='Blues' , annot=True)
+    ax.set_title('Multi-Collinearity of Car Attributes')
+    st.write(fig)
+
+st.header(symbol + " Data Correlation")
+show_corr()
 
 #get statistics on the data
 st.header(symbol+" Data Statistics")
@@ -182,14 +205,274 @@ def calc_price_rate_of_change(data_dated):
     data_dated['Price_Rate_Of_Change'] = data_dated.groupby('Ticker')['4. close'].transform(lambda x: x.pct_change(periods = n))
 
 
+starting_date = '2015-01-01'
+pd.options.mode.chained_assignment = None  # default='warn'
 
 
-# allow user to select model
-option = st.sidebar.selectbox(
-  'Select Model?',
- ('Ridge Regression', 'Random Forest', 'LSTM'))
+# Evaluation metrics
+RMSE=[]
+Rsquared=[]
+Mae=[]
+
+# Building ridge regression model
+def pricePrediction_LR(symbol, days, starting_date, end_date):
+    #     obtain stock data
+    stock_df = stock_data(symbol, starting_date, end_date)
+
+    #     obtaining technical indicators
+    stochastic_Oscillator(stock_df)
+    calc_williams_r(stock_df)
+    calc_macd(stock_df)
+    calc_price_rate_of_change(stock_df)
+
+    #     set the trading window we are trying to predict
+    stock_df_targeted = trading_window(stock_df, days)
+    # #     remove the last column of the data as it will be null
+    #     stock_df_targeted= stock_df_targeted[:-1]
+
+    stock_df_targeted.reset_index(inplace=True)
+    stock_df_targeted = stock_df_targeted.dropna()
+
+    stock_df_targeted_scaled = stock_df_targeted
+    stock_df_targeted_scaled.head(10)
+    stock_df_targeted_scaled.drop(
+        ['Ticker', '1. open', '2. high', '3. low', '5. adjusted close', '6. volume', '8. split coefficient', 'low_14',
+         'high_14', 'MACD_EMA'], axis=1, inplace=True)
+
+    stock_df_targeted_scaled = sc.fit_transform(stock_df_targeted_scaled.drop(columns=['date']))
+
+    # Creating Feature and Target
+    X = stock_df_targeted_scaled[:, :6]
+    y = stock_df_targeted_scaled[:, 6:]
+
+    split = int(0.65 * len(X))
+    X_train = X[:split]
+    y_train = y[:split]
+    X_test = X[split:]
+    y_test = y[split:]
+
+    # show_plot(X_train, 'Training Data')
+    # show_plot(X_test, 'Testing Data')
+
+    regression_model = Ridge()
+    regression_model.fit(X_train, y_train)
+
+    lr_accuracy = regression_model.score(X_test, y_test)
+    predicted_prices = regression_model.predict(X)
+
+    print("Linear Regression Score: ", lr_accuracy)
+    print('RMSE: ' + str(math.sqrt(mean_squared_error(y, predicted_prices))))
+    print('Rsquared ' + str(r2_score(y, predicted_prices)))
+    print('MAE: ' + str(mean_absolute_error(y, predicted_prices)))
+
+    Predicted = []
+    for i in predicted_prices:
+        Predicted.append(i[0])
+
+    close = []
+    for i in stock_df_targeted_scaled:
+        close.append(i[0])
 
 
+    df_predicted = stock_df_targeted[['date']]
+    df_predicted['Close'] = close
+    df_predicted['Prediction'] = Predicted
+    RMSE.append(math.sqrt(mean_squared_error(y, predicted_prices)))
+    Rsquared.append(r2_score(y, predicted_prices))
+    Mae.append(mean_absolute_error(y, predicted_prices))
+
+
+    interactive_plot(df_predicted, "Original Vs. Prediction")
+
+
+
+
+# randomForest Model
+def pricePrediction_RandomForest(symbol, days, start_date, end_date):
+    p = 0
+    mse = []
+    rmse = []
+    rsquared = []
+    mae = []
+
+    #     obtain stock data
+    stock_df = stock_data(symbol, start_date, end_date)
+
+    #     obtaining technical indicators
+    stochastic_Oscillator(stock_df)
+    calc_williams_r(stock_df)
+    calc_macd(stock_df)
+    calc_price_rate_of_change(stock_df)
+
+    #     set the trading window we are trying to predict
+    stock_df_targeted = trading_window(stock_df, days)
+
+    stock_df_targeted.reset_index(inplace=True)
+    stock_df_targeted = stock_df_targeted.dropna()
+
+    stock_df_targeted_scaled = stock_df_targeted
+    #     stock_df_targeted_scaled.head(10)
+    stock_df_targeted_scaled.drop(
+        ['Ticker', '2. high', '3. low', '5. adjusted close', '7. dividend amount', '6. volume', '8. split coefficient',
+         'low_14', 'high_14', 'MACD_EMA'], axis=1, inplace=True)
+
+    stock_df_targeted_scaled = sc.fit_transform(stock_df_targeted_scaled.drop(columns=['date']))
+
+    #     # Creating Feature and Target
+    X = stock_df_targeted_scaled[:, :6]
+    y = stock_df_targeted_scaled[:, 6:]
+
+    split = int(0.65 * len(X))
+    X_train = X[:split]
+    y_train = y[:split]
+    X_test = X[split:]
+    y_test = y[split:]
+
+    # show_plot(X_train, 'Training Data')
+    # show_plot(X_test, 'Testing Data')
+
+    rf = RandomForestRegressor()
+
+    rf.fit(X_train, y_train.ravel())
+    pred_rf = rf.predict(X)
+
+    print('MSE: ' + str(mean_squared_error(y, pred_rf)))
+    print('RMSE: ' + str(math.sqrt(mean_squared_error(y, pred_rf))))
+    print('Rsquaed: ' + str(r2_score(y, pred_rf)))
+    print('MAE: ' + str(mean_absolute_error(y, pred_rf)))
+    print('')
+
+    Predicted = []
+    for i in pred_rf:
+        Predicted.append(i)
+
+    close = []
+    for i in stock_df_targeted_scaled:
+        close.append(i[0])
+
+    df_predicted = stock_df_targeted[['date']]
+    df_predicted['Close'] = close
+    df_predicted['Prediction'] = Predicted
+
+    interactive_plot(df_predicted, "Original Vs. Prediction for ")
+
+
+
+# LSTM model
+def pricePrediction_LSTM(symbol, days, start_date, end_date):
+    #     obtain stock data
+    stock_df = stock_data(symbol, start_date, end_date)
+
+    #     obtaining technical indicators
+    stochastic_Oscillator(stock_df)
+    calc_williams_r(stock_df)
+    calc_macd(stock_df)
+    calc_price_rate_of_change(stock_df)
+
+    stock_df.reset_index(inplace=True)
+
+    #     set the trading window we are trying to predict
+    stock_df_targeted = trading_window(stock_df, days)
+    stock_df_targeted.drop(
+        ['Ticker', '1. open', '2. high', '3. low', '5. adjusted close', '6. volume', '7. dividend amount',
+         '8. split coefficient', 'low_14', 'high_14', 'MACD_EMA'], axis=1, inplace=True)
+    stock_df_targeted.dropna(inplace=True)
+    training_data_X = stock_df_targeted.iloc[:, 1:6].values
+    training_data_y = stock_df_targeted.iloc[:, 6:].values
+
+    stock_df_targeted_scaled = sc.fit_transform(stock_df_targeted.drop(columns=['date']))
+
+    X = sc.fit_transform(training_data_X)
+    y = sc.fit_transform(training_data_y)
+
+    # Convert the data into array format
+    X = np.asarray(X)
+    y = np.asarray(y)
+
+    # Split the data
+    split = int(0.7 * len(X))
+    X_train = X[:split]
+    y_train = y[:split]
+    X_test = X[split:]
+    y_test = y[split:]
+
+    # Reshape the 1D arrays to 3D arrays to feed in the model
+    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+    X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+    X_train.shape, X_test.shape
+
+    # Create the model
+    inputs = keras.layers.Input(shape=(X_train.shape[1], X_train.shape[2]))
+    x = keras.layers.LSTM(150, return_sequences=True)(inputs)
+    x = keras.layers.Dropout(0.3)(x)
+    x = keras.layers.LSTM(150, return_sequences=True)(x)
+    x = keras.layers.Dropout(0.3)(x)
+    x = keras.layers.LSTM(150)(x)
+    outputs = keras.layers.Dense(1, activation='linear')(x)
+
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    model.compile(optimizer='adam', loss="mse", metrics=['mean_squared_error', 'mae'])
+    model.summary()
+
+    # Trai the model
+    history = model.fit(
+        X_train, y_train,
+        epochs=20,
+        batch_size=32,
+        validation_split=0.2
+    )
+
+    predicted = model.predict(X)
+
+    test_predicted = []
+
+    for i in predicted:
+        test_predicted.append(i[0])
+
+    close = []
+    for i in stock_df_targeted_scaled:
+        close.append(i[0])
+
+    df_predicted = stock_df_targeted[['date']]
+    df_predicted['Close'] = close
+    df_predicted['Prediction'] = predicted
+
+    #     interactive_plot(df_predicted, "Original Vs. Prediction for " )
+    scores = model.evaluate(X, y, verbose=0)
+
+    print("MSE:" + str((scores[0])))
+    print("MAE:" + str((scores[1])))
+    print('R2 Score: ', r2_score(y, predicted))
+    # Plot the data
+    interactive_plot(df_predicted, "Original Vs Prediction")
+
+# 'Ridge Regression', 'Random Forest', 'LSTM'
+if model=='Ridge Regression':
+    st.header("Ridge Regression Model for " + str(num_days) + " Day(s)")
+    # Pretend we're doing some computation that takes time.
+    progress_bar = st.progress(0)
+
+    for i in range(100):
+        # Update progress bar.
+        progress_bar.progress(i + 1)
+
+
+    pricePrediction_LR(symbol, num_days, start_date, end_date)
+    progress_bar.balloons();
+elif model=='Random Forest':
+    st.header("Random Forest model for "+ str(num_days) + " Day(s)")
+    pricePrediction_RandomForest(symbol, num_days, start_date, end_date)
+elif model == 'LSTM':
+
+    st.header("LSTM Model for " + str(num_days) + " Day(s)")
+    pricePrediction_LSTM(symbol, num_days, start_date, end_date)
+
+st.header("Evaluation metrics")
+# add evaluation metrics to dataframe
+evaluation_metrics = {'Rsquared': Rsquared, 'Mae': Mae, 'RMSE': RMSE}
+
+# add eval metrics to table
+chart = st.table(evaluation_metrics)
 
 
 st.sidebar.button("Run")
