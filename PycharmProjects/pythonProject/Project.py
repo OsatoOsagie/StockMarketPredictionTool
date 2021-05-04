@@ -45,11 +45,13 @@ from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from tensorflow import keras
 import numpy as np
+from sklearn.model_selection import KFold
 import time
 import yfinance as yf
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
+import plotly.graph_objects as go
 nltk.download('punkt')
 
 
@@ -87,7 +89,9 @@ st.sidebar.header('Query parameters')
 # present date
 today = date.today()
 
-
+buys = []
+sells = []
+thresh = 0.2
 # In[10]:
 
 
@@ -105,14 +109,13 @@ def getStockTickers():
 
 # In[11]:
 
-
 # function to obtain the users input
 def get_input():
 #     the starting period of the data we obtain from the Alpha Vantage API.
     start_date = st.sidebar.text_input("Start Date", "2015-01-01")
 #     the end period of the data obtained from the Alpha Vantage API.
     end_date = st.sidebar.text_input("End Date", today)
-#    a string of characters (usually letters) that represents publicly traded companies on an exchange 
+#    a string of characters (usually letters) that represents publicly traded companies on an exchange
     stock_symbol = st.sidebar.selectbox(
         'Select Stock Symbol',
         (getStockTickers()))
@@ -490,10 +493,11 @@ Mae = []
 
 # In[34]:
 
+cv = KFold(n_splits=10, random_state=None, shuffle=False)
 
 # Building ridge regression model
 def pricePrediction_LR(symbol, days, starting_date, end_date):
-   
+
     #     obtain stock data
     stock_df = stock_data(symbol, starting_date, end_date)
 
@@ -509,7 +513,7 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
     stock_df_targeted.reset_index(inplace=True)
     stock_df_targeted = stock_df_targeted.dropna()
 
-    stock_df_targeted_scaled = stock_df_targeted
+    stock_df_targeted_scaled = stock_df_targeted.copy()
     # drop unused columns in dataset
     stock_df_targeted_scaled.drop(
         ['Ticker', '4. close', '7. dividend amount', '3. low', '5. adjusted close', '6. volume', '8. split coefficient',
@@ -531,13 +535,15 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
     X_test = X[split:]
     y_test = y[split:]
 
+
 # building and evaluating the model
-    regression_model = Ridge()
+    regression_model = Ridge(alpha=1)
     regression_model.fit(X_train, y_train)
     last_element = X_test[len(X_test) - 1]
-    current_price= y_test[len(X_test) - 1]
+    original_prices= stock_df_targeted['4. close'].values
+    current_price= original_prices[len(original_prices) - 1]
     last_element=last_element.reshape(1, -1)
-    current_price= current_price.reshape(1, -1)
+
 
     # using model to predict the entire dataset
     predicted_prices = regression_model.predict(X)
@@ -550,8 +556,6 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
 
     # calculating profits
     profitInXDays= y_sc.inverse_transform(predicted_price)
-    current_price= y_sc.inverse_transform(current_price)
-    current_price= current_price[0][0]
     share_amount= investment_amount/current_price
     profit=round((share_amount * profitInXDays[0][0])-investment_amount,2)
 
@@ -565,7 +569,7 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
         close.append(i[0])
     # adding predicted and actual prices to a data frame
     df_predicted = stock_df_targeted[['date']]
-    df_predicted['Actual'] = close
+    df_predicted['Close'] = close
     df_predicted['Prediction'] = Predicted
 
     # evaluating the prediction metrics
@@ -577,8 +581,27 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
     # appending information to web page
 
     interactive_plot(df_predicted, "Original Vs. Prediction")
-    st.info("in {} day(s) the price of this stock will be ${}".format(days, round(profitInXDays[0][0], 2)))
-    st.info("You would make ${} in {} day(s)".format(profit, days))
+    st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays[0][0], 2)))
+    st.info("You would make £{} in {} day(s)".format(profit, days))
+
+    unscaled_y_test = y_sc.inverse_transform(y_test)
+    y_test_predicted = y_sc.inverse_transform(eval_predict)
+    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
+    y_test_predicted=  [item for sublist in y_test_predicted for item in sublist]
+    data = {'Close': unscaled_y_test,
+            'Prediction': y_test_predicted}
+
+    st.header("Trading Algorithm")
+    # Create DataFrame
+    df = pd.DataFrame(data)
+    trade_algorithm(df)
+    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
+    compute_earnings(buys, sells)
+    # print(y_test_predicted)
+
+
+
+
 
 
 # In[35]:
@@ -603,7 +626,7 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
     stock_df_targeted.reset_index(inplace=True)
     stock_df_targeted = stock_df_targeted.dropna()
 
-    stock_df_targeted_scaled = stock_df_targeted
+    stock_df_targeted_scaled = stock_df_targeted.copy()
 
     # dropping columns that were not used in the data
     stock_df_targeted_scaled.drop(
@@ -633,9 +656,9 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
 
 
     last_element = X_test[len(X_test) - 1]
-    current_price = y_test[len(X_test) - 1]
+    original_prices = stock_df_targeted['4. close'].values
+    current_price = original_prices[len(original_prices) - 1]
     last_element = last_element.reshape(1, -1)
-    current_price = current_price.reshape(1, -1)
     # predicting future price
     predicted_price = rf.predict(last_element)
     predicted_price = predicted_price.reshape(1, -1)
@@ -648,8 +671,6 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
 
     # calculating profits
     profitInXDays = y_sc.inverse_transform(predicted_price)
-    current_price = y_sc.inverse_transform(current_price)
-    current_price = current_price[0][0]
     share_amount = investment_amount / current_price
     profit = round((share_amount * profitInXDays[0][0]) - investment_amount, 2)
 
@@ -666,6 +687,7 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
     df_predicted['Close'] = close
     df_predicted['Prediction'] = Predicted
 
+
     # evaluating the prediction metrics
     RMSE.append(math.sqrt(mean_squared_error(y_test, eval_predict)))
     Rsquared.append(r2_score(y_test, eval_predict))
@@ -676,9 +698,24 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
     interactive_plot(df_predicted, "Original Vs. Prediction for ")
 
     # appending information to web page
-    st.info("in {} day(s) the price of this stock will be ${}".format(days, round(profitInXDays[0][0], 2)))
-    st.info("You would make ${} in {} day(s)".format(profit, days))
+    st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays[0][0], 2)))
+    st.info("You would make £{} in {} day(s)".format(profit, days))
 
+    unscaled_y_test = y_sc.inverse_transform(y_test)
+    y_test_predicted = y_sc.inverse_transform(eval_predict.reshape(1, -1))
+
+    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
+    y_test_predicted= [item for sublist in y_test_predicted for item in sublist]
+
+    data = {'Close': unscaled_y_test,
+            'Prediction': y_test_predicted}
+
+    st.header("Trading Algorithm")
+    # Create DataFrame
+    df = pd.DataFrame(data)
+    trade_algorithm(df)
+    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
+    compute_earnings(buys, sells)
 
 
 # In[36]:
@@ -700,6 +737,8 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
 
     #     set the trading window we are trying to predict
     stock_df_targeted = trading_window(stock_df, days)
+
+    stock_df_targeted_ = stock_df_targeted.copy()
     stock_df_targeted.drop(
         ['Ticker', '4. close', '7. dividend amount', '3. low', '5. adjusted close', '6. volume', '8. split coefficient',
          'low_14', 'high_14', 'MACD_EMA'], axis=1, inplace=True)
@@ -753,9 +792,10 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     eval_predict = model.predict(X_test)
 
     last_element = X_test[len(X_test) - 1]
-    current_price = y_test[len(X_test) - 1]
+    original_prices = stock_df_targeted_['4. close'].values
+    current_price = original_prices[len(original_prices) - 1]
     last_element = last_element.reshape(1, -1)
-    current_price = current_price.reshape(1, -1)
+
     # predicting future price
     predicted_price = model.predict(last_element)
     predicted_price = predicted_price.reshape(1, -1)
@@ -763,12 +803,10 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     # calculating profits
     profitInXDays = y_sc.inverse_transform(predicted_price)
     profitInXDays= round(profitInXDays[0][0], 2)
-    current_price = y_sc.inverse_transform(current_price)
-    current_price = current_price[0][0]
     share_amount = investment_amount / current_price
     profit = round((share_amount * profitInXDays) - investment_amount, 2)
 
-    print(profitInXDays)
+
     test_predicted = []
 
     for i in predicted:
@@ -794,8 +832,114 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     # Plot the data
     interactive_plot(df_predicted, "Original Vs Prediction")
     # appending information to web page
-    st.info("in {} day(s) the price of this stock will be ${}".format(days, round(profitInXDays, 2)))
-    st.info("You would make ${} in {} day(s)".format(profit, days))
+
+    st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays, 2)))
+    st.info("You would make £{} in {} day(s)".format(profit, days))
+
+    unscaled_y_test = y_sc.inverse_transform(y_test)
+    y_test_predicted = y_sc.inverse_transform(eval_predict)
+    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
+    y_test_predicted = [item for sublist in y_test_predicted for item in sublist]
+    data = {'Close': unscaled_y_test,
+            'Prediction': y_test_predicted}
+
+    st.header("Trading Algorithm")
+    # Create DataFrame
+    df = pd.DataFrame(data)
+    trade_algorithm(df)
+    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
+    compute_earnings(buys, sells)
+
+
+
+
+# plotting trading algorithm
+
+def trade_algorithm(df_predicted):
+    x=0
+    for  actual , predicted  in zip( df_predicted['Close'], df_predicted['Prediction']):
+        # price_today=[]
+        # predicted_price=[]
+        # price_today.append(actual)
+        # price_today=np.array(price_today).reshape(1, -1)
+        # price_today= y_sc.inverse_transform(price_today)
+        # predicted_price.append(predicted)
+        # predicted_price=np.array(predicted_price).reshape(1, -1)
+        # predicted_price= y_sc.inverse_transform(predicted_price)
+
+        predicted_price=predicted
+        price_today=actual
+
+        delta= predicted_price- price_today
+
+        if delta > thresh:
+            buys.append((x,price_today))
+        elif delta <= thresh:
+            sells.append((x,price_today))
+        x +=1
+
+def plot_trades(y_test_predicted, unscaled_y_test, sells, buys):
+    fig= go.Figure()
+    start = 0
+    end = -1
+    fig.add_trace(
+        go.Scatter(
+            x=list(list(zip(*buys))[0]),
+            y=list(list(zip(*buys))[1]),
+            marker=dict(color="green", size=6),
+            mode="markers",
+            name="Buy",
+
+    ))
+
+    fig.add_trace(
+        go.Scatter(
+            x=list(list(list(zip(*sells))[0])),
+            y=list(list(list(zip(*sells))[1])),
+            marker=dict(color="red", size=6),
+            mode="markers",
+            name="Sell",
+
+        ))
+
+    fig.add_trace(
+        go.Scatter(
+            y=unscaled_y_test[start:end],
+            marker=dict(color="gold", size=6),
+            name="Actual",
+
+        ))
+
+    fig.add_trace(
+        go.Scatter(
+            y=y_test_predicted[start:end],
+            marker=dict(color="blue", size=6),
+            name="Predicted",
+
+        ))
+    st.write(fig)
+
+
+def compute_earnings(buys, sells):
+    purchase_amt = 10
+    stock = 0
+    balance = 0
+    while len(buys) > 0 and len(sells) > 0:
+        if buys[0][0] < sells[0][0]:
+            # time to buy $10 worth of stock
+            balance -= purchase_amt
+            stock += purchase_amt / buys[0][1]
+            buys.pop(0)
+        else:
+            # time to sell all of our stock
+            balance += stock * sells[0][1]
+            stock = 0
+            sells.pop(0)
+    st.info("Profit made from test data is £{}".format(balance))
+
+
+
+
 
 
 # 'Ridge Regression', 'Random Forest', 'LSTM'
@@ -824,7 +968,7 @@ elif model == 'LSTM':
 
 st.header("Evaluation metrics")
 # add evaluation metrics to dataframe
-evaluation_metrics = {'Rsquared': Rsquared,  'Adj_Rsquared': adj_Rsquared,'Mae': Mae, 'RMSE': RMSE}
+evaluation_metrics = {'Rsquared': Rsquared,  'Adj_Rsquared': adj_Rsquared,'MAE': Mae, 'RMSE': RMSE}
 
 # add eval metrics to table
 chart = st.table(evaluation_metrics)
