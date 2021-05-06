@@ -125,7 +125,7 @@ def get_input():
         'Select Stock Symbol',
         (getStockTickers()))
     num_days = st.sidebar.number_input("Number of day(s)", 1)
-    investment_amount = st.sidebar.number_input("Investment Amount (££)", 1)
+    investment_amount = st.sidebar.number_input("Investment Amount (££)", 10)
     model = st.sidebar.selectbox(
         'Select Model',
         (['Ridge Regression', 'Random Forest', 'LSTM']))
@@ -164,6 +164,12 @@ def interactive_plot(df, title):
     fig = px.line(title=title)
     for i in df.columns[1:]:
         fig.add_scatter(x=df['date'], y=df[i], name=i)
+    fig.update_layout(
+
+        xaxis_title="Year",
+        yaxis_title="Price",
+
+    )
     st.write(fig)
 
 
@@ -860,14 +866,6 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
 def trade_algorithm(df_predicted):
     x=0
     for  actual , predicted  in zip( df_predicted['Close'], df_predicted['Prediction']):
-        # price_today=[]
-        # predicted_price=[]
-        # price_today.append(actual)
-        # price_today=np.array(price_today).reshape(1, -1)
-        # price_today= y_sc.inverse_transform(price_today)
-        # predicted_price.append(predicted)
-        # predicted_price=np.array(predicted_price).reshape(1, -1)
-        # predicted_price= y_sc.inverse_transform(predicted_price)
 
         predicted_price=predicted
         price_today=actual
@@ -920,11 +918,17 @@ def plot_trades(y_test_predicted, unscaled_y_test, sells, buys):
             name="Predicted",
 
         ))
+
+    fig.update_layout(
+        xaxis_title="Trade Number",
+        yaxis_title="Price (£)",
+
+    )
     st.write(fig)
 
 # compute the earnings from the trading algorithm
 def compute_earnings(buys, sells):
-    purchase_amt = 10
+    purchase_amt = investment_amount
     stock = 0
     balance = 0
     while len(buys) > 0 and len(sells) > 0:
@@ -954,6 +958,8 @@ if model == 'Ridge Regression':
     for i in range(100):
         # Update progress bar.
         progress_bar.progress(i + 1)
+
+    progress_bar.balloons()
 
     pricePrediction_LR(symbol, num_days, start_date, end_date)
 elif model == 'Random Forest':
