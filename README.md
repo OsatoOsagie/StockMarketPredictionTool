@@ -1,5 +1,6 @@
-# Project Name
-Stock Market Prediction Tool
+
+# Stock Market Prediction Tool
+
 ## Information about this repository
 
 ## Built With
