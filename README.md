@@ -1,9 +1,6 @@
-
 # Stock Market Prediction Tool
 
-## Information about this repository
-
-## Built With
+## Built With:
 
 * [Python](https://docs.python.org/3/)  
 * [Streamlit](https://docs.streamlit.io/en/stable/ )
@@ -15,7 +12,8 @@
 * [NLTK](https://www.nltk.org/ )
 * [Plotly](https://plotly.com/python/ )
 
-### Prerequisites
+## Prerequisites
+
 Please ensure that the aforementioned libraries listed above are installed before running the project.
 
 ## Getting Started
