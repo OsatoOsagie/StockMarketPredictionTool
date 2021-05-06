@@ -21,11 +21,11 @@ Please ensure that the aforementioned libraries listed above are installed befor
 1. Download Project
 2. Install aforementioned libraries
 3. Run web application on terminal -  streamlit run "~/oo115/PycharmProjects/pythonProject/Project.py"
-4. Open web browser 
+4. Open web browser to the local host server 
 
 ## Authors
 
-* **OsatO Osagie** - *Initial work* - [University Of Leicester](https://campus.cs.le.ac.uk/gitlab/ug_project/20-21/oo115/)
+* **Osato Osagie** - *Initial work* - [University Of Leicester](https://campus.cs.le.ac.uk/gitlab/ug_project/20-21/oo115/)
 
 ## Acknowledgments
 
