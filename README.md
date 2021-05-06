@@ -8,7 +8,7 @@ Stock Market Prediction Tool
 * [Streamlit](https://docs.streamlit.io/en/stable/ )
 * [yfinance](https://pypi.org/project/yfinance/ )
 * [AlphaVantage](https://www.alphavantage.co/documentation/ ) 
-* [Sikit-learn](https://scikit-learn.org/0.21/ documentation.html)
+* [Sikit-learn](https://scikit-learn.org/0.21/)
 * [Seaborn](https://seaborn.pydata.org/introduction.html)
 * [Numpy](https://numpy.org/doc/stable/)
 * [NLTK](https://www.nltk.org/ )
@@ -30,8 +30,8 @@ Please ensure that the aforementioned libraries listed above are installed befor
 
 ## Acknowledgments
 
-* Inspiration taken from https://towardsdatascience.com/getting-rich-quick-with-machine-learning-and-stock-market-predictions-696802da94fe
-* https://www.geeksforgeeks.org/python-text-summarizer/ 
+* [Trading Algorithm](https://towardsdatascience.com/getting-rich-quick-with-machine-learning-and-stock-market-predictions-696802da94fe)
+* [Text Summerizer](https://www.geeksforgeeks.org/python-text-summarizer/)
 
 
 ## software artefacts
