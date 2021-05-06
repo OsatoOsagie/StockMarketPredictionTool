@@ -49,7 +49,7 @@ from sklearn.model_selection import KFold
 import time
 import yfinance as yf
 import nltk
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords as sw
 from nltk.tokenize import word_tokenize, sent_tokenize
 import plotly.graph_objects as go
 nltk.download('punkt')
@@ -64,38 +64,43 @@ st.markdown('''
 Shown are the stock price data for query companies!
 **Credits**
 - App built by [Osato Osagie](https://www.linkedin.com/in/osato-osagie) (aka [HenchTechGuy](https://github.com/greggs25))
-- Built in `Python` using `Streamlit`,`yfinance`,`AlphaVantage`, `Scikit-learn`, `Tensorflow`,`Pandas`, `Plotly`, `Math` and `Seaborn`
+- Built in `Python` using `Streamlit`,`yfinance`,`AlphaVantage`, `Scikit-learn`, `Tensorflow`,`Pandas`, `Plotly`, and `Seaborn`
 ''')
+# header
 st.write('---')
 
 
 # In[7]:
 
-
+# stock tickers for dropdown list
 df_tickers = pd.read_csv('nasdaq_screener.csv')
 
 
 # In[8]:
 
-
+# scaler for feature variables
 sc = MinMaxScaler(feature_range=(0, 1))
+# scaler for dependent variables
 y_sc = MinMaxScaler(feature_range=(0, 1))
 
 # In[9]:
 
-
+# side bar title
 st.sidebar.header('Query parameters')
 
 # present date
 today = date.today()
 
+# list of all buys from trading algorithms
 buys = []
+# list of all the sells made from trading algorithm
 sells = []
+# threshold for trading algorithm
 thresh = 0.2
-# In[10]:
 
 
-# function to extract the list of functions
+
+# function to extract the list of tickers
 def getStockTickers():
 
     tickers = []
@@ -212,20 +217,18 @@ string_summary = tickerData.info['longBusinessSummary']
 
 
 def summarise_text(string_summary):
-    # Input text - to summarize
-    text = string_summary
+    #  text to sum up
+    message = string_summary
 
-    # Tokenizing the text
-    stopWords = set(stopwords.words("english"))
-    words = word_tokenize(text)
+    # Text tokenization
+    haltWords = set(sw.words("english"))
+    phrases = word_tokenize(message)
 
-    # Creating a frequency table to keep the
-    # score of each word
-
+    # Making a frequency distribution table to record each word's score
     frequencyTable  = dict()
-    for word in words:
+    for word in phrases:
         word = word.lower()
-        if word in stopWords:
+        if word in haltWords:
             continue
         if word in frequencyTable:
             frequencyTable[word] += 1
@@ -234,29 +237,29 @@ def summarise_text(string_summary):
 
     # Creating a dictionary to keep the score
     # of each sentence
-    sentences = sent_tokenize(text)
-    sentenceValue = dict()
+    sentences = sent_tokenize(message)
+    sentenceWorthiness = dict()
 
-    for sentence in sentences:
+    for i in sentences:
         for word, freq in frequencyTable.items():
-            if word in sentence.lower():
-                if sentence in sentenceValue:
-                    sentenceValue[sentence] += freq
+            if word in i.lower():
+                if i in sentenceWorthiness:
+                    sentenceWorthiness[i] += freq
                 else:
-                    sentenceValue[sentence] = freq
+                    sentenceWorthiness[i] = freq
 
-    sumOfValues  = 0
-    for sentence in sentenceValue:
-        sumOfValues += sentenceValue[sentence]
+    totalOfValues  = 0
+    for i in sentenceWorthiness:
+        totalOfValues += sentenceWorthiness[i]
 
     # Average value of a sentence from the original text
 
-    average = int(sumOfValues / len(sentenceValue))
+    average = int(totalOfValues / len(sentenceWorthiness))
 
     # Storing sentences into our summary.
     textsummary = ''
     for sentence in sentences:
-        if (sentence in sentenceValue) and (sentenceValue[sentence] > (1.2 * average)):
+        if (sentence in sentenceWorthiness) and (sentenceWorthiness[sentence] > (1.2 * average)):
             textsummary += " " + sentence
     return textsummary
 
@@ -280,44 +283,43 @@ st.header( " Close Price\n")
 
 
 
-
-closing_price= data_dated['4. close']
-coefficients, residuals, _, _, _ = np.polyfit(range(len(closing_price.index)),closing_price,1,full=True)
-mse = residuals[0]/(len(closing_price.index))
-nrmse = np.sqrt(mse)/(closing_price.max() - closing_price.min())
-# print('Slope ' + str(coefficients[0]))
-# print('NRMSE: ' + str(nrmse))
-
-color_override="green"
-if coefficients[0] < 0:
-    color_override="red"
+def plot_closingPrice(data_dated):
+    closing_price= data_dated['4. close']
+    coefficients, residuals, _, _, _ = np.polyfit(range(len(closing_price.index)),closing_price,1,full=True)
+    mse = residuals[0]/(len(closing_price.index))
+    nrmse = np.sqrt(mse)/(closing_price.max() - closing_price.min())
 
 
-fig = px.scatter(x=data_dated.index, y=data_dated['4. close'], trendline="ols", trendline_color_override=color_override)
-fig.update_layout(
+    color_override="green"
+    if coefficients[0] < 0:
+        color_override="red"
 
-    xaxis_title="Year",
-    yaxis_title="Price",
 
-    )
+    fig = px.scatter(x=data_dated.index, y=data_dated['4. close'], trendline="ols", trendline_color_override=color_override)
+    fig.update_layout(
 
-# fig = px.line(trendline="ols")
-# fig.add_scatter(x=data_dated.index, y=data_dated['4. close'], name="Close")
-# fig= px.line([coefficients[0]*x + coefficients[1] for x in range(len(closing_price))])
-# fig.show()
-st.write(fig)
+        xaxis_title="Year",
+        yaxis_title="Price",
+
+        )
+
+    # fig = px.line(trendline="ols")
+    # fig.add_scatter(x=data_dated.index, y=data_dated['4. close'], name="Close")
+    # fig= px.line([coefficients[0]*x + coefficients[1] for x in range(len(closing_price))])
+    # fig.show()
+    st.write(fig)
 
 
 # In[22]:
 
 
-# interpreting the slope of the closing price
-if coefficients[0] > 0:
-    st.info('Between {} to {} there has been an upward trend in the closing price of {} stock'.format(start_date, end_date, string_name))
-else:
-    st.info('Between {} to {} there has been a downward trend in the closing price of {} stock'.format(start_date, end_date, string_name))
+    # interpreting the slope of the closing price
+    if coefficients[0] > 0:
+        st.info('Between {} to {} there has been an upward trend in the closing price of {} stock'.format(start_date, end_date, string_name))
+    else:
+        st.info('Between {} to {} there has been a downward trend in the closing price of {} stock'.format(start_date, end_date, string_name))
 
-
+plot_closingPrice(data_dated)
 # In[23]:
 
 
@@ -493,7 +495,6 @@ Mae = []
 
 # In[34]:
 
-cv = KFold(n_splits=10, random_state=None, shuffle=False)
 
 # Building ridge regression model
 def pricePrediction_LR(symbol, days, starting_date, end_date):
@@ -701,6 +702,7 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
     st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays[0][0], 2)))
     st.info("You would make £{} in {} day(s)".format(profit, days))
 
+# trading algorithm
     unscaled_y_test = y_sc.inverse_transform(y_test)
     y_test_predicted = y_sc.inverse_transform(eval_predict.reshape(1, -1))
 
@@ -836,6 +838,7 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays, 2)))
     st.info("You would make £{} in {} day(s)".format(profit, days))
 
+
     unscaled_y_test = y_sc.inverse_transform(y_test)
     y_test_predicted = y_sc.inverse_transform(eval_predict)
     unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
@@ -843,7 +846,7 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     data = {'Close': unscaled_y_test,
             'Prediction': y_test_predicted}
 
-    st.header("Trading Algorithm")
+    st.header("Trading Algorithm using Testing Data")
     # Create DataFrame
     df = pd.DataFrame(data)
     trade_algorithm(df)
@@ -853,8 +856,7 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
 
 
 
-# plotting trading algorithm
-
+# trade algorithm
 def trade_algorithm(df_predicted):
     x=0
     for  actual , predicted  in zip( df_predicted['Close'], df_predicted['Prediction']):
@@ -878,6 +880,7 @@ def trade_algorithm(df_predicted):
             sells.append((x,price_today))
         x +=1
 
+# plot trades from trading algorithm
 def plot_trades(y_test_predicted, unscaled_y_test, sells, buys):
     fig= go.Figure()
     start = 0
@@ -919,7 +922,7 @@ def plot_trades(y_test_predicted, unscaled_y_test, sells, buys):
         ))
     st.write(fig)
 
-
+# compute the earnings from the trading algorithm
 def compute_earnings(buys, sells):
     purchase_amt = 10
     stock = 0
@@ -942,7 +945,7 @@ def compute_earnings(buys, sells):
 
 
 
-# 'Ridge Regression', 'Random Forest', 'LSTM'
+# check with model the user has picked
 if model == 'Ridge Regression':
     st.header("Ridge Regression Model for " + str(num_days) + " Day(s)")
     # Pretend we're doing some computation that takes time.
@@ -953,7 +956,6 @@ if model == 'Ridge Regression':
         progress_bar.progress(i + 1)
 
     pricePrediction_LR(symbol, num_days, start_date, end_date)
-    progress_bar.balloons()
 elif model == 'Random Forest':
     st.header("Random Forest model for " + str(num_days) + " Day(s)")
     pricePrediction_RandomForest(symbol, num_days, start_date, end_date)
