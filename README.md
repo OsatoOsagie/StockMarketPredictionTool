@@ -1,4 +1,4 @@
-# Your project name here
+# Project Name
 Stock Market Prediction Tool
 ## Information about this repository
 
@@ -7,21 +7,21 @@ Stock Market Prediction Tool
 * [Python](https://docs.python.org/3/)  
 * [Streamlit](https://docs.streamlit.io/en/stable/ )
 * [yfinance](https://pypi.org/project/yfinance/ )
-* [AlphaVantage] (https://www.alphavantage.co/documentation/ ) 
-* [Sikit-learn] (https://scikit-learn.org/0.21/ documentation.html)
-* [Seaborn] (https://seaborn.pydata.org/introduction.html)
-* [Numpy] (https://numpy.org/doc/stable/)
-* [NLTK] (https://www.nltk.org/ )
-* [Plotly] (https://plotly.com/python/ )
+* [AlphaVantage](https://www.alphavantage.co/documentation/ ) 
+* [Sikit-learn](https://scikit-learn.org/0.21/ documentation.html)
+* [Seaborn](https://seaborn.pydata.org/introduction.html)
+* [Numpy](https://numpy.org/doc/stable/)
+* [NLTK](https://www.nltk.org/ )
+* [Plotly](https://plotly.com/python/ )
 
 ### Prerequisites
-Please ensure that the aforementioned libraries are installed before running the project
+Please ensure that the aforementioned libraries listed above are installed before running the project.
 
 ## Getting Started
 
 1. Download Project
 2. Install aforementioned libraries
-3. Run web application -  streamlit run "~/oo115/PycharmProjects/pythonProject/Project.py"
+3. Run web application on terminal -  streamlit run "~/oo115/PycharmProjects/pythonProject/Project.py"
 4. Open web browser 
 
 ## Authors
@@ -38,7 +38,7 @@ Please ensure that the aforementioned libraries are installed before running the
 
 * oo115/PycharmProjects/pythonProject/Project.py
 
-##documentation Location 
+## documentation Location 
 
 * oo115/docs
 
