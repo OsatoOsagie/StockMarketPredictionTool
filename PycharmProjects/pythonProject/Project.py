@@ -591,20 +591,6 @@ def pricePrediction_LR(symbol, days, starting_date, end_date):
     st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays[0][0], 2)))
     st.info("You would make £{} in {} day(s)".format(profit, days))
 
-    unscaled_y_test = y_sc.inverse_transform(y_test)
-    y_test_predicted = y_sc.inverse_transform(eval_predict)
-    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
-    y_test_predicted=  [item for sublist in y_test_predicted for item in sublist]
-    data = {'Close': unscaled_y_test,
-            'Prediction': y_test_predicted}
-
-    st.header("Trading Algorithm")
-    # Create DataFrame
-    df = pd.DataFrame(data)
-    trade_algorithm(df)
-    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
-    compute_earnings(buys, sells)
-    # print(y_test_predicted)
 
 
 
@@ -708,22 +694,6 @@ def pricePrediction_RandomForest(symbol, days, start_date, end_date):
     st.info("in {} day(s) the price of this stock will be £{}".format(days, round(profitInXDays[0][0], 2)))
     st.info("You would make £{} in {} day(s)".format(profit, days))
 
-# trading algorithm
-    unscaled_y_test = y_sc.inverse_transform(y_test)
-    y_test_predicted = y_sc.inverse_transform(eval_predict.reshape(1, -1))
-
-    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
-    y_test_predicted= [item for sublist in y_test_predicted for item in sublist]
-
-    data = {'Close': unscaled_y_test,
-            'Prediction': y_test_predicted}
-
-    st.header("Trading Algorithm")
-    # Create DataFrame
-    df = pd.DataFrame(data)
-    trade_algorithm(df)
-    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
-    compute_earnings(buys, sells)
 
 
 # In[36]:
@@ -845,104 +815,11 @@ def pricePrediction_LSTM(symbol, days, start_date, end_date):
     st.info("You would make £{} in {} day(s)".format(profit, days))
 
 
-    unscaled_y_test = y_sc.inverse_transform(y_test)
-    y_test_predicted = y_sc.inverse_transform(eval_predict)
-    unscaled_y_test = [item for sublist in unscaled_y_test for item in sublist]
-    y_test_predicted = [item for sublist in y_test_predicted for item in sublist]
-    data = {'Close': unscaled_y_test,
-            'Prediction': y_test_predicted}
-
-    st.header("Trading Algorithm using Testing Data")
-    # Create DataFrame
-    df = pd.DataFrame(data)
-    trade_algorithm(df)
-    plot_trades(unscaled_y_test, y_test_predicted, sells, buys)
-    compute_earnings(buys, sells)
 
 
 
 
-# trade algorithm
-def trade_algorithm(df_predicted):
-    x=0
-    for  actual , predicted  in zip( df_predicted['Close'], df_predicted['Prediction']):
 
-        predicted_price=predicted
-        price_today=actual
-
-        delta= predicted_price- price_today
-
-        if delta > thresh:
-            buys.append((x,price_today))
-        elif delta <= thresh:
-            sells.append((x,price_today))
-        x +=1
-
-# plot trades from trading algorithm
-def plot_trades(y_test_predicted, unscaled_y_test, sells, buys):
-    fig= go.Figure()
-    start = 0
-    end = -1
-    fig.add_trace(
-        go.Scatter(
-            x=list(list(zip(*buys))[0]),
-            y=list(list(zip(*buys))[1]),
-            marker=dict(color="green", size=6),
-            mode="markers",
-            name="Buy",
-
-    ))
-
-    fig.add_trace(
-        go.Scatter(
-            x=list(list(list(zip(*sells))[0])),
-            y=list(list(list(zip(*sells))[1])),
-            marker=dict(color="red", size=6),
-            mode="markers",
-            name="Sell",
-
-        ))
-
-    fig.add_trace(
-        go.Scatter(
-            y=unscaled_y_test[start:end],
-            marker=dict(color="gold", size=6),
-            name="Actual",
-
-        ))
-
-    fig.add_trace(
-        go.Scatter(
-            y=y_test_predicted[start:end],
-            marker=dict(color="blue", size=6),
-            name="Predicted",
-
-        ))
-
-    fig.update_layout(
-        xaxis_title="Trade Number",
-        yaxis_title="Price (£)",
-
-    )
-    st.write(fig)
-
-# compute the earnings from the trading algorithm
-def compute_earnings(buys, sells):
-    purchase_amt = investment_amount
-    stock = 0
-    balance = 0
-    while len(buys) > 0 and len(sells) > 0:
-        if buys[0][0] < sells[0][0]:
-            # time to buy $10 worth of stock
-            balance -= purchase_amt
-            stock += purchase_amt / buys[0][1]
-            buys.pop(0)
-        else:
-            # time to sell all of our stock
-            balance += stock * sells[0][1]
-            stock = 0
-            sells.pop(0)
-    st.info("Profit made from test data is £{}".format(balance))
 
 
 
